@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, Alert } from 'react-native';
 import * as SQLite from 'expo-sqlite';
 import { Feather } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 
-export default function MenuScreen({ navigation }: any) {
+export default function MenuScreen({ route, navigation }: any) {
+  const { user } = route.params || {};
   const [products, setProducts] = useState<any[]>([]);
 
   useEffect(() => {
@@ -45,7 +46,11 @@ export default function MenuScreen({ navigation }: any) {
       activeOpacity={isTirinha ? 0.7 : 1}
       onPress={() => {
         if (isTirinha) {
-          navigation.navigate('OrderBuilder', { product: item });
+          if (!user) {
+            Alert.alert('Conta Necessária', 'Você precisa de uma conta de realeza para pedir nosso frango!', [{ text: 'Fazer Login Agora', onPress: () => navigation.replace('Splash') }]);
+          } else {
+            navigation.navigate('OrderBuilder', { product: item, user: user });
+          }
         }
       }}
     >

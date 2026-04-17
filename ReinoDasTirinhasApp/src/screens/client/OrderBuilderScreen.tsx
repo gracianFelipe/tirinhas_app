@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import * as SQLite from 'expo-sqlite';
 import { theme } from '../../constants/theme';
 
 export default function OrderBuilderScreen({ route, navigation }: any) {
-  const { product } = route.params;
+  const { product, user } = route.params; // Agora recebe o user da navegação (User autenticado)
   const [sauces, setSauces] = useState<any[]>([]);
   const [selectedSauces, setSelectedSauces] = useState<number[]>([]);
-  const [customerName, setCustomerName] = useState('');
 
   useEffect(() => {
     const fetchSauces = async () => {
@@ -23,7 +22,7 @@ export default function OrderBuilderScreen({ route, navigation }: any) {
       setSelectedSauces(selectedSauces.filter(s => s !== id));
     } else {
       if (selectedSauces.length >= 2) {
-        Alert.alert('Limite', 'Só é possível selecionar até 2 molhos premium no Combo!');
+        Alert.alert('Limite Alcançado', 'Você já escolheu seus 2 molhos premium no Combo!');
       } else {
         setSelectedSauces([...selectedSauces, id]);
       }
@@ -32,24 +31,19 @@ export default function OrderBuilderScreen({ route, navigation }: any) {
 
   const handleCheckout = async () => {
     if (selectedSauces.length !== 2) {
-      Alert.alert('Atenção', 'Você DEVE selecionar exatamente 2 molhos para fazer jus à nossa maravilha gourmet!');
-      return;
-    }
-    if (!customerName.trim()) {
-      Alert.alert('Atenção', 'Quem é a Majestade que receberá o pedido? Digite seu nome.');
+      Alert.alert('Atenção', 'Você DEVE selecionar exatamente 2 molhos para acompanhar.');
       return;
     }
 
     try {
       const db = await SQLite.openDatabaseAsync('reino_das_tirinhas.db');
       
-      const customerResult = await db.runAsync('INSERT INTO Customer (name) VALUES (?)', [customerName]);
-      const customerId = customerResult.lastInsertRowId;
-      
       const orderNumber = 'RT-' + Math.floor(Math.random() * 10000);
+      
+      // Inserimos a Ordem usando o user_id real do Banco
       const orderResult = await db.runAsync(
-          'INSERT INTO Orders (customer_id, order_number, status, total_amount) VALUES (?, ?, ?, ?)',
-          [customerId, orderNumber, 'Preparando', product.price]
+          'INSERT INTO Orders (user_id, order_number, status, total_amount) VALUES (?, ?, ?, ?)',
+          [user.id, orderNumber, 'Recebido na Cozinha', product.price]
       );
       const orderId = orderResult.lastInsertRowId;
 
@@ -57,8 +51,8 @@ export default function OrderBuilderScreen({ route, navigation }: any) {
       await db.runAsync('INSERT INTO OrderItem (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)', [orderId, selectedSauces[0], 1, 0]);
       await db.runAsync('INSERT INTO OrderItem (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)', [orderId, selectedSauces[1], 1, 0]);
 
-      Alert.alert('Nobre Pedido Efetuado!', `Sua ordem ${orderNumber} acabou de chegar à nossa cozinha.`, [
-        { text: 'Voltar ao Cardápio', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Menu' }] }) }
+      Alert.alert('Pedido Oficial Efetuado!', `Sua ordem ${orderNumber} acabou de chegar à nossa cozinha sr(a) ${user.name}.`, [
+        { text: 'Voltar ao Cardápio', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Menu', params: { user } }] }) }
       ]);
     } catch (error) {
       console.error(error);
@@ -81,11 +75,8 @@ export default function OrderBuilderScreen({ route, navigation }: any) {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView 
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-      >
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <Text style={styles.backButtonText}>← Voltar</Text>
         </TouchableOpacity>
@@ -123,13 +114,6 @@ export default function OrderBuilderScreen({ route, navigation }: any) {
         </View>
 
         <View style={styles.checkoutBox}>
-           <TextInput
-             style={styles.input}
-             placeholder="Informe seu nome"
-             placeholderTextColor={theme.colors.textSecondary}
-             value={customerName}
-             onChangeText={setCustomerName}
-           />
            <TouchableOpacity 
              style={[styles.confirmButton, selectedSauces.length !== 2 ? styles.disabledButton : null]} 
              onPress={handleCheckout}
@@ -138,13 +122,13 @@ export default function OrderBuilderScreen({ route, navigation }: any) {
            </TouchableOpacity>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  scroll: { padding: 16, paddingBottom: 300 },
+  scroll: { padding: 16, paddingBottom: 100 },
   backButton: { marginTop: 30, marginBottom: 10 },
   backButtonText: { color: theme.colors.primaryDark, fontSize: 16, fontWeight: 'bold' },
   headerTitle: { fontSize: 26, fontWeight: '800', color: theme.colors.textPrimary, marginBottom: 16 },
@@ -164,7 +148,6 @@ const styles = StyleSheet.create({
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#ddd', marginLeft: 10 },
   radioSelected: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary },
   checkoutBox: { backgroundColor: '#FFF', padding: 16, borderRadius: 12, elevation: 4, shadowColor: '#000', shadowOpacity: 0.05 },
-  input: { height: 50, backgroundColor: theme.colors.background, borderRadius: 8, paddingHorizontal: 16, marginBottom: 16, borderWidth: 1, borderColor: '#EFEFEF', color: theme.colors.textPrimary },
   confirmButton: { backgroundColor: theme.colors.primary, paddingVertical: 14, borderRadius: 8, alignItems: 'center' },
   disabledButton: { backgroundColor: '#CCC' },
   confirmText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 }

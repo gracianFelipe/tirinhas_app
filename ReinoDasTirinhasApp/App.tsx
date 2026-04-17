@@ -5,7 +5,6 @@ import * as SQLite from 'expo-sqlite';
 
 import SplashScreen from './src/screens/client/SplashScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
-import EmployeeLoginScreen from './src/screens/auth/EmployeeLoginScreen';
 import MenuScreen from './src/screens/client/MenuScreen';
 import OrderBuilderScreen from './src/screens/client/OrderBuilderScreen';
 import DashboardScreen from './src/screens/employee/DashboardScreen';
@@ -34,7 +33,6 @@ export default function App() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Splash" component={SplashScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
-        <Stack.Screen name="EmployeeLogin" component={EmployeeLoginScreen} />
         <Stack.Screen name="Dashboard" component={DashboardScreen} />
         <Stack.Screen name="Menu" component={MenuScreen} />
         <Stack.Screen name="OrderBuilder" component={OrderBuilderScreen} />

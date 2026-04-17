@@ -1,20 +1,42 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert } from 'react-native';
 import * as SQLite from 'expo-sqlite';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { Feather } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 
 export default function DashboardScreen({ navigation }: any) {
   const [orders, setOrders] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
+  // A função MÁGICA para o Felipe poder ver o banco de dados no PC dele
+  const exportDatabase = async () => {
+    try {
+      const dbPath = FileSystem.documentDirectory + 'SQLite/reino_das_tirinhas.db';
+      const fileInfo = await FileSystem.getInfoAsync(dbPath);
+      
+      if (!fileInfo.exists) {
+        Alert.alert('Erro', 'O Banco de dados não foi encontrado fisicamente.');
+        return;
+      }
+
+      await Sharing.shareAsync(dbPath, { dialogTitle: 'Exportar Banco de Dados' });
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Ops!', 'Não foi possível exportar.');
+    }
+  };
+
   const loadOrders = async () => {
     setRefreshing(true);
     try {
       const db = await SQLite.openDatabaseAsync('reino_das_tirinhas.db');
       
+      // Update the join from Customer legada para User novo
       const query = `
         SELECT 
-          o.id as order_id, o.order_number, o.status, o.total_amount, c.name as customer_name,
+          o.id as order_id, o.order_number, o.status, o.total_amount, u.name as customer_name,
           (
             SELECT GROUP_CONCAT(p.name, ' | ') 
             FROM OrderItem oi 
@@ -22,7 +44,7 @@ export default function DashboardScreen({ navigation }: any) {
             WHERE oi.order_id = o.id
           ) as items
         FROM Orders o
-        JOIN Customer c ON o.customer_id = c.id
+        JOIN User u ON o.user_id = u.id
         ORDER BY o.id DESC
       `;
       const result = await db.getAllAsync(query);
@@ -59,10 +81,18 @@ export default function DashboardScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Forja de Tirinhas (Status)</Text>
-        <TouchableOpacity style={styles.logoutButton} onPress={() => navigation.replace('Splash')}>
-          <Text style={styles.logoutText}>SAIR</Text>
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Forja (Status)</Text>
+        
+        <View style={styles.actionHeader}>
+          {/* BOTÃO EXPORTAR BANCO DE DADOS */}
+          <TouchableOpacity style={[styles.logoutButton, {backgroundColor: '#e74c3c', marginRight: 10}]} onPress={exportDatabase}>
+            <Text style={styles.logoutText}>EXPORTAR .DB</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.logoutButton} onPress={() => navigation.replace('Splash')}>
+            <Text style={styles.logoutText}>SAIR</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
@@ -71,7 +101,7 @@ export default function DashboardScreen({ navigation }: any) {
         renderItem={renderOrder}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadOrders} />}
         contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
-        ListEmptyComponent={<Text style={styles.emptyText}>Cozinha Ligeiramente Ociosa. Nenhum pedido na fila.</Text>}
+        ListEmptyComponent={<Text style={styles.emptyText}>Cozinha Ociosa. Nenhum pedido na fila.</Text>}
       />
     </View>
   );
@@ -81,8 +111,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#EDF2F7' },
   header: { backgroundColor: '#3D2C23', paddingTop: 50, paddingBottom: 20, paddingHorizontal: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: theme.colors.background },
-  logoutButton: { backgroundColor: theme.colors.primary, paddingHorizontal: 15, paddingVertical: 8, borderRadius: 6 },
-  logoutText: { color: '#FFF', fontWeight: 'bold', fontSize: 12 },
+  actionHeader: { flexDirection: 'row' },
+  logoutButton: { backgroundColor: theme.colors.primary, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 6 },
+  logoutText: { color: '#FFF', fontWeight: 'bold', fontSize: 11 },
   emptyText: { textAlign: 'center', marginTop: 50, color: '#888', fontSize: 16 },
   orderCard: { backgroundColor: '#FFF', padding: 16, borderRadius: 12, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 5, elevation: 3, borderLeftWidth: 5, borderLeftColor: theme.colors.primary },
   orderHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
