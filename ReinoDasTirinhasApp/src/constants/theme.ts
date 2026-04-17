@@ -1,6 +1,6 @@
 export const theme = {
   colors: {
-    background: '#F9F6F0',   // Creme Claro / Off-White (fundo da logo)
+    background: '#f6efdd',   // Creme Claro / Off-White (fundo exato da logo)
     surface: '#FFFFFF',      // Branco puro para modais e cartões interiores
     primary: '#E49C2C',      // Laranja Quente/Dourado (como as tirinhas na imagem)
     primaryDark: '#CD7522',  // Laranja Cobre

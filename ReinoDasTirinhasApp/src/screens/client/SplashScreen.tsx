@@ -1,54 +1,41 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Image } from 'react-native';
+import { StyleSheet, Animated, Image, View } from 'react-native';
 import { theme } from '../../constants/theme';
 
 export default function SplashScreen({ navigation }: any) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
 
   useEffect(() => {
-    // Revelar logo e textos simultaneamente com animação Gourmet
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 2000,
+        duration: 1800,
         useNativeDriver: true,
       }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 2000,
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 4,
         useNativeDriver: true,
       })
     ]).start(() => {
-      // Como ainda não existe a tela 'Home', ele ficará parado no Splash por enquanto.
-      // Futuramente: setTimeout(() => navigation.replace('Home'), 1500)
+      // Redireciona para o Login de clientes e funcionário
+      setTimeout(() => navigation.replace('Login'), 1200);
     });
-  }, [fadeAnim, slideAnim, navigation]);
+  }, [fadeAnim, scaleAnim]);
 
   return (
     <View style={styles.container}>
       <Animated.View style={[
         styles.content, 
-        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+        { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }
       ]}>
-        
-        {/* Renderiza a logo importada com base na análise visual */}
-        <View style={styles.imageContainer}>
-          <Image 
-            source={require('../../../assets/logo.jpg')} 
-            style={styles.logo} 
-            resizeMode="contain" 
-          />
-        </View>
-
-        {/* Título Principal */}
-        <Text style={styles.title}>REINO DAS TIRINHAS</Text>
-        
-        {/* Linha Divisória Clássica */}
-        <View style={styles.divider} />
-        
-        {/* Subtítulo Gourmet */}
-        <Text style={styles.subtitle}>QUENTE • CROCANTE • DELICIOSO</Text>
+        {/* Referenciando logo2.jpg para forçar que o Expo quebre o cache antigo e leia sua nova imagem */}
+        <Image 
+          source={require('../../../assets/logo2.jpg')} 
+          style={styles.logo} 
+          resizeMode="contain" 
+        />
       </Animated.View>
     </View>
   );
@@ -57,46 +44,19 @@ export default function SplashScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    // Volta a usar a cor constante do theme.js (que você inteligentemente cravou pra #f6efdd)
     backgroundColor: theme.colors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },
   content: {
-    alignItems: 'center',
-    width: '85%',
-  },
-  imageContainer: {
-    marginBottom: 24,
-    width: 280,
-    height: 280,
     justifyContent: 'center',
     alignItems: 'center',
+    width: '100%',
   },
   logo: {
-    width: '100%',
-    height: '100%',
-  },
-  title: {
-    fontSize: 27,
-    // Em React Native mobile, 'serif' busca a fonte com serifa padrão do sistema.
-    fontFamily: 'serif',
-    color: theme.colors.textPrimary,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  divider: {
-    height: 1.5,
-    width: '100%',
-    backgroundColor: theme.colors.textPrimary,
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 11,
-    color: theme.colors.textPrimary,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-    textAlign: 'center',
+    // Imagem ganha um pouquinho mais de espaço para ficar fluida e parecer nativa
+    width: 380,
+    height: 380,
   },
 });
