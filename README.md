@@ -1,20 +1,25 @@
-# Reino das Tirinhas App
+# Reino das Tirinhas App 🍗👑
 
-Este é um projeto educacional e pessoal criado para fins de estudo e treinamento prático em desenvolvimento mobile. O objetivo é desenvolver um aplicativo MVP para simular um fluxo de pedidos e visualização de cardápio gourmet.
+Projeto pessoal para estudo e treinamento prático intensivo focado em **Desenvolvimento Mobile com Arquitetura de Dados Local**.
+Este MVP foi construído como um aplicativo de autoatendimento ("Cardápio Digital" e "Finalizador de Ordens") para um restaurante gourmet estilo dark-kitchen / delivery.
 
-## 🚀 Tecnologias e Ferramentas
-- **Frontend/Mobile:** React Native, Expo, TypeScript
-- **Banco de Dados (MVP):** SQLite Local (via `expo-sqlite`)
-- **Navegação:** React Navigation
+## 🚀 Tecnologias Utilizadas
+- **React Native** + **Expo**: Motor multiplataforma nativo.
+- **TypeScript**: Programação assíncrona robusta previnindo falsas invocações.
+- **Expo SQLite (Embarcado)**: Manipulação nativa local de banco de dados (`reino_das_tirinhas.db`), rodando queries offline com Transações de Banco e chaves estrangeiras para relacionamentos 1-N e N-N.
+- **React Navigation**: Gerenciador (`@react-navigation/native-stack`) para transição controlada das pilhas de telas.
+- **Design System Customizado**: Todos os componentes bebem de um único ecossistema centralizado (`theme.ts`) que mapeia cores Creme/Marrom/Dourado harmonizadas nativamente.
 
-## 🎨 Identidade Visual
-A identidade visual e a paleta de cores foram baseadas na temática **Quente | Crocante | Delicioso**, possuindo um tom elegante (*gourmet*):
-- **Creme Claro / Off-White** (`#F9F6F0`)
-- **Marrom Expresso** (`#3D2C23`)
-- **Laranja/Dourado Crocante** (`#E49C2C`)
-- **Azul Royal** (`#1F3C73`)
-- **Vermelho Intenso** (`#A62B22`)
+## 🌟 Estrutura e Funcionalidades Construídas
 
-## 📋 Escopo (MVP)
-- **Área do Cliente:** Splash screen inicial, Cardápio de Tirinhas e Molhos Gourmet (com descrições realçadas), carrinho e finalização de pedido.
-- **Área do Funcionário:** Área protegida para listar pedidos (simulando um Painel de Cozinha/Caixa).
+### 🛒 A Jornada do Cliente
+- **Aterrissagem Animada (Splash)**: Animações assíncronas `Animated.spring` com opacidade que convergem com perfeição o fundo da logo com o fundo renderizado do container.
+- **Cardápio "No-Login" Flexível**: Uma lista dinâmica populada a partir da inicialização da base de dados local, categorizando Frangos de Molhos Extras de maneira super leve via `FlatList`. Acompanhado de **8 imagens geradas ativamente via Inteligência Artificial** com estilo cartoon flat-minimalista.
+- **Bouncer de Negócio (Carrinho Restrito)**: O OrderBuilder impede a navegação para o checkout usando logica atrelada ao limite máximo de *State* (A regra OBRIGA a escolha de 2 e apenas 2 molhos especiais no carrinho).
+
+### 🍳 A Jornada da Cozinha (Staff)
+- **Passagem Secreta**: Uma tela oculta de verificação em cascata, que só engatilha acesso validando senhas parametrizadas, substituindo a Pilha limpa de App para um painel que clientes normais são incapazes de ver ou "Voltar" (Back-Button Android inativado).
+- **Data-Mining Real Time (O Dashboard)**: Usa Queries puras de `SQL JOINs` para buscar simultaneamente as 3 pontas (Nome do Cliente, Ordem Numérica e Nome dos Produtos atrelados na String), varrendo a tabela de Item_Ordens com `GROUP_CONCAT` para exibir na mão do chef tudo o que ele tem que separar na panela!
+
+---
+> *Status: MVP Base Funcionalizado. Desenvolvido para finalidades de aperfeiçoamento arquitetônico de estado em React Native com Relacional SQLite.*
