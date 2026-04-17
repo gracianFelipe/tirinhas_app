@@ -1,15 +1,25 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform, ScrollView, TouchableWithoutFeedback, Keyboard, LayoutAnimation, UIManager } from 'react-native';
+import { useSQLiteContext } from 'expo-sqlite';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { theme } from '../../constants/theme';
 import * as SQLite from 'expo-sqlite';
 
 export default function LoginScreen({ navigation }: any) {
+  const db = useSQLiteContext();
   const [isLogin, setIsLogin] = useState(true);
   
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+
+  const phoneRef = useRef<TextInput>(null);
+  const loginRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   const executeAuth = async () => {
     if (!login || !password) {
@@ -18,8 +28,7 @@ export default function LoginScreen({ navigation }: any) {
     }
 
     try {
-      const db = await SQLite.openDatabaseAsync('reino_das_tirinhas.db');
-      
+      // O DB agora vem do contexto superior (useSQLiteContext)
       if (isLogin) {
         // Fluxo de Login
         const result: any = await db.getFirstAsync('SELECT * FROM User WHERE login = ? AND password = ?', [login, password]);
@@ -62,19 +71,29 @@ export default function LoginScreen({ navigation }: any) {
     }
   };
 
-  return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Reino das Tirinhas</Text>
+  const toggleTab = (value: boolean) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setIsLogin(value);
+  };
 
-        <View style={styles.tabContainer}>
-          <TouchableOpacity style={[styles.tab, isLogin && styles.activeTab]} onPress={() => setIsLogin(true)}>
-            <Text style={[styles.tabText, isLogin && styles.activeTabText]}>ENTRAR</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.tab, !isLogin && styles.activeTab]} onPress={() => setIsLogin(false)}>
-            <Text style={[styles.tabText, !isLogin && styles.activeTabText]}>CRIAR CONTA</Text>
-          </TouchableOpacity>
-        </View>
+  return (
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <KeyboardAvoidingView 
+        style={styles.container} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 40}
+      >
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <Text style={styles.title}>Reino das Tirinhas</Text>
+  
+          <View style={styles.tabContainer}>
+            <TouchableOpacity style={[styles.tab, isLogin && styles.activeTab]} onPress={() => toggleTab(true)}>
+              <Text style={[styles.tabText, isLogin && styles.activeTabText]}>ENTRAR</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.tab, !isLogin && styles.activeTab]} onPress={() => toggleTab(false)}>
+              <Text style={[styles.tabText, !isLogin && styles.activeTabText]}>CRIAR CONTA</Text>
+            </TouchableOpacity>
+          </View>
 
         <View style={styles.card}>
           {!isLogin && (
@@ -85,41 +104,56 @@ export default function LoginScreen({ navigation }: any) {
                 placeholderTextColor={theme.colors.textSecondary}
                 value={name}
                 onChangeText={setName}
+                returnKeyType="next"
+                onSubmitEditing={() => phoneRef.current?.focus()}
+                blurOnSubmit={false}
               />
               <TextInput 
+                ref={phoneRef}
                 style={styles.input} 
                 placeholder="Seu Telefone (Opcional)" 
                 keyboardType="phone-pad"
                 placeholderTextColor={theme.colors.textSecondary}
                 value={phone}
                 onChangeText={setPhone}
+                returnKeyType="next"
+                onSubmitEditing={() => loginRef.current?.focus()}
+                blurOnSubmit={false}
               />
             </>
           )}
 
           <TextInput 
+            ref={loginRef}
             style={styles.input} 
             placeholder="Nome de Usuário (Login)" 
             autoCapitalize="none"
             placeholderTextColor={theme.colors.textSecondary}
             value={login}
             onChangeText={setLogin}
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+            blurOnSubmit={false}
           />
           <TextInput 
+            ref={passwordRef}
             style={styles.input} 
             placeholder="Sua Senha" 
             secureTextEntry
             placeholderTextColor={theme.colors.textSecondary}
             value={password}
             onChangeText={setPassword}
+            returnKeyType="done"
+            onSubmitEditing={executeAuth}
           />
 
           <TouchableOpacity style={styles.primaryButton} onPress={executeAuth}>
             <Text style={styles.primaryButtonText}>{isLogin ? 'Acessar o Salão' : 'Registrar no Reino'}</Text>
           </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </TouchableWithoutFeedback>
   );
 }
 

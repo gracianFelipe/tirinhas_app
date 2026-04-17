@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, Alert } from 'react-native';
-import * as SQLite from 'expo-sqlite';
+import { useSQLiteContext } from 'expo-sqlite';
 import { Feather } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 
 export default function MenuScreen({ route, navigation }: any) {
+  const db = useSQLiteContext();
   const { user } = route.params || {};
   const [products, setProducts] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const db = await SQLite.openDatabaseAsync('reino_das_tirinhas.db');
         const rows = await db.getAllAsync('SELECT * FROM Product');
         setProducts(rows);
       } catch (e) {

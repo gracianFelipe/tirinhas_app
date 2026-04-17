@@ -5,7 +5,6 @@ export async function initializeDatabase(db: SQLite.SQLiteDatabase) {
     await db.execAsync(`
       PRAGMA journal_mode = WAL;
       
-      -- Tabela master de Usuários (Reúne Funcionários e Clientes)
       CREATE TABLE IF NOT EXISTS User (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           login TEXT NOT NULL UNIQUE,
@@ -45,7 +44,7 @@ export async function initializeDatabase(db: SQLite.SQLiteDatabase) {
       );
     `);
 
-    // Semeando produtos iniciais se o banco estiver vazio
+    // Semeando produtos iniciais
     const records: any = await db.getAllAsync('SELECT COUNT(*) as count FROM Product');
     if (records[0].count === 0) {
       await db.execAsync(`
@@ -59,7 +58,6 @@ export async function initializeDatabase(db: SQLite.SQLiteDatabase) {
         ('Ervas Finas', 'Mistura harmonizada de sal e ervas finas', 0.00, 'Molho', 'ervas_finas.png'),
         ('Molho Proteico', 'Creme intenso de alho em base proteica e ervas', 0.00, 'Molho', 'proteico.png');
       `);
-      console.log('Produtos Padrão Criados!');
     }
 
     // Criando a primeira conta de Funcionário (Root)
@@ -69,7 +67,6 @@ export async function initializeDatabase(db: SQLite.SQLiteDatabase) {
         INSERT INTO User (login, password, role, name) 
         VALUES ('Felipe', '1234?', 'employee', 'Felipe - Chefe Real')
       `);
-      console.log('Conta Mestre Felipe Criada no Sistema!');
     }
 
   } catch (error) {

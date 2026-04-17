@@ -1,37 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert } from 'react-native';
-import * as SQLite from 'expo-sqlite';
-import * as FileSystem from 'expo-file-system';
+import { useSQLiteContext } from 'expo-sqlite';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Feather } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
 
 export default function DashboardScreen({ navigation }: any) {
+  const db = useSQLiteContext();
   const [orders, setOrders] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
   // A função MÁGICA para o Felipe poder ver o banco de dados no PC dele
   const exportDatabase = async () => {
     try {
-      const dbPath = FileSystem.documentDirectory + 'SQLite/reino_das_tirinhas.db';
-      const fileInfo = await FileSystem.getInfoAsync(dbPath);
+      // Usamos (FileSystem as any) por segurança com o compilador TS no modo legacy
+      const legacyFS = FileSystem as any;
+      const dbPath = legacyFS.documentDirectory + 'SQLite/reino_das_tirinhas.db';
       
-      if (!fileInfo.exists) {
-        Alert.alert('Erro', 'O Banco de dados não foi encontrado fisicamente.');
-        return;
-      }
+      // Caminho público no Android que não exige permissões especiais de root para o adb pull
+      const publicDownloadPath = '/sdcard/Download/reino_das_tirinhas.db';
 
+      // Copia o arquivo para a área pública
+      await legacyFS.copyAsync({
+        from: dbPath,
+        to: 'file://' + publicDownloadPath
+      });
+
+      // Também abre o compartilhamento padrão por conveniência
       await Sharing.shareAsync(dbPath, { dialogTitle: 'Exportar Banco de Dados' });
+      
+      Alert.alert('Sucesso!', 'Banco exportado para a área pública (/Downloads). Agora você pode rodar o "puxar_banco.bat" no seu PC.');
     } catch (err) {
       console.error(err);
-      Alert.alert('Ops!', 'Não foi possível exportar.');
+      Alert.alert('Ops!', 'Não foi possível exportar o banco.');
     }
   };
 
   const loadOrders = async () => {
     setRefreshing(true);
     try {
-      const db = await SQLite.openDatabaseAsync('reino_das_tirinhas.db');
       
       // Update the join from Customer legada para User novo
       const query = `

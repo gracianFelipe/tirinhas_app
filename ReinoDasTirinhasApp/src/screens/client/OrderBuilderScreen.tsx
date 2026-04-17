@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import * as SQLite from 'expo-sqlite';
+import { useSQLiteContext } from 'expo-sqlite';
 import { theme } from '../../constants/theme';
 
 export default function OrderBuilderScreen({ route, navigation }: any) {
+  const db = useSQLiteContext();
   const { product, user } = route.params; // Agora recebe o user da navegação (User autenticado)
   const [sauces, setSauces] = useState<any[]>([]);
   const [selectedSauces, setSelectedSauces] = useState<number[]>([]);
 
   useEffect(() => {
     const fetchSauces = async () => {
-      const db = await SQLite.openDatabaseAsync('reino_das_tirinhas.db');
       const rows = await db.getAllAsync('SELECT * FROM Product WHERE category = "Molho"');
       setSauces(rows);
     };
@@ -36,7 +36,6 @@ export default function OrderBuilderScreen({ route, navigation }: any) {
     }
 
     try {
-      const db = await SQLite.openDatabaseAsync('reino_das_tirinhas.db');
       
       const orderNumber = 'RT-' + Math.floor(Math.random() * 10000);
       
