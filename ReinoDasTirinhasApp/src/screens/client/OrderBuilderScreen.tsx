@@ -1,18 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
-import { useSQLiteContext } from 'expo-sqlite';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, ScrollView } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { theme } from '../../constants/theme';
+import { supabase } from '../../lib/supabase';
+import { resolveProductImage } from '../../utils/productImages';
+import { Product, RootStackParamList } from '../../types';
 
-export default function OrderBuilderScreen({ route, navigation }: any) {
-  const db = useSQLiteContext();
-  const { product, user } = route.params; // Agora recebe o user da navegação (User autenticado)
-  const [sauces, setSauces] = useState<any[]>([]);
+type Props = NativeStackScreenProps<RootStackParamList, 'OrderBuilder'>;
+
+export default function OrderBuilderScreen({ route, navigation }: Props) {
+  const { product, user } = route.params;
+  const [sauces, setSauces] = useState<Product[]>([]);
   const [selectedSauces, setSelectedSauces] = useState<number[]>([]);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchSauces = async () => {
-      const rows = await db.getAllAsync('SELECT * FROM Product WHERE category = "Molho"');
-      setSauces(rows);
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, description, price, category, image')
+        .eq('category', 'Molho')
+        .order('id', { ascending: true });
+      if (error) {
+        console.error(error);
+        return;
+      }
+      setSauces((data ?? []) as Product[]);
     };
     fetchSauces();
   }, []);
@@ -35,41 +48,45 @@ export default function OrderBuilderScreen({ route, navigation }: any) {
       return;
     }
 
+    setSubmitting(true);
     try {
-      
       const orderNumber = 'RT-' + Math.floor(Math.random() * 10000);
-      
-      // Inserimos a Ordem usando o user_id real do Banco
-      const orderResult = await db.runAsync(
-          'INSERT INTO Orders (user_id, order_number, status, total_amount) VALUES (?, ?, ?, ?)',
-          [user.id, orderNumber, 'Recebido na Cozinha', product.price]
-      );
-      const orderId = orderResult.lastInsertRowId;
 
-      await db.runAsync('INSERT INTO OrderItem (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)', [orderId, product.id, 1, product.price]);
-      await db.runAsync('INSERT INTO OrderItem (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)', [orderId, selectedSauces[0], 1, 0]);
-      await db.runAsync('INSERT INTO OrderItem (order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)', [orderId, selectedSauces[1], 1, 0]);
+      const { data: orderRow, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          user_id: user.id,
+          order_number: orderNumber,
+          status: 'Recebido na Cozinha',
+          total_amount: product.price,
+        })
+        .select('id')
+        .single<{ id: number }>();
 
-      Alert.alert('Pedido Oficial Efetuado!', `Sua ordem ${orderNumber} acabou de chegar à nossa cozinha sr(a) ${user.name}.`, [
-        { text: 'Voltar ao Cardápio', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Menu', params: { user } }] }) }
+      if (orderError || !orderRow) {
+        throw orderError ?? new Error('Order insert returned no id');
+      }
+
+      const orderId = orderRow.id;
+
+      const { error: itemsError } = await supabase.from('order_items').insert([
+        { order_id: orderId, product_id: product.id, quantity: 1, unit_price: product.price },
+        { order_id: orderId, product_id: selectedSauces[0], quantity: 1, unit_price: 0 },
+        { order_id: orderId, product_id: selectedSauces[1], quantity: 1, unit_price: 0 },
       ]);
+
+      if (itemsError) throw itemsError;
+
+      Alert.alert(
+        'Pedido Oficial Efetuado!',
+        `Sua ordem ${orderNumber} acabou de chegar à nossa cozinha sr(a) ${user.name}.`,
+        [{ text: 'Voltar ao Cardápio', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Menu', params: { user } }] }) }]
+      );
     } catch (error) {
       console.error(error);
       Alert.alert('Erro', 'Houve um problema. Tente Novamente.');
-    }
-  };
-
-  const resolveImage = (imageName: string) => {
-    switch (imageName) {
-      case 'tirinhas_300.png': return require('../../../assets/products/tirinhas_300.png');
-      case 'tirinhas_500.png': return require('../../../assets/products/tirinhas_500.png');
-      case 'tirinhas_700.png': return require('../../../assets/products/tirinhas_700.png');
-      case 'alho_limao.png': return require('../../../assets/products/alho_limao.png');
-      case 'baconese.png': return require('../../../assets/products/baconese.png');
-      case 'defumado.png': return require('../../../assets/products/defumado.png');
-      case 'ervas_finas.png': return require('../../../assets/products/ervas_finas.png');
-      case 'proteico.png': return require('../../../assets/products/proteico.png');
-      default: return require('../../../assets/logo2.jpg');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -80,9 +97,9 @@ export default function OrderBuilderScreen({ route, navigation }: any) {
             <Text style={styles.backButtonText}>← Voltar</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Montar Combinação</Text>
-        
+
         <View style={styles.mainProduct}>
-           <Image source={resolveImage(product.image)} style={styles.productImage} resizeMode="contain" />
+           <Image source={resolveProductImage(product.image)} style={styles.productImage} resizeMode="contain" />
            <View style={{flex: 1}}>
              <Text style={styles.productName}>{product.name}</Text>
              <Text style={styles.productPrice}>R$ {product.price.toFixed(2)}</Text>
@@ -97,12 +114,12 @@ export default function OrderBuilderScreen({ route, navigation }: any) {
           {sauces.map((sauce) => {
             const isSelected = selectedSauces.includes(sauce.id);
             return (
-              <TouchableOpacity 
-                key={sauce.id} 
-                style={[styles.sauceCard, isSelected && styles.sauceCardSelected]} 
+              <TouchableOpacity
+                key={sauce.id}
+                style={[styles.sauceCard, isSelected && styles.sauceCardSelected]}
                 onPress={() => toggleSauce(sauce.id)}
               >
-                <Image source={resolveImage(sauce.image)} style={styles.sauceImage} />
+                <Image source={resolveProductImage(sauce.image)} style={styles.sauceImage} />
                 <View style={{flex:1}}>
                    <Text style={[styles.sauceName, isSelected && styles.textSelected]}>{sauce.name}</Text>
                 </View>
@@ -113,11 +130,12 @@ export default function OrderBuilderScreen({ route, navigation }: any) {
         </View>
 
         <View style={styles.checkoutBox}>
-           <TouchableOpacity 
-             style={[styles.confirmButton, selectedSauces.length !== 2 ? styles.disabledButton : null]} 
+           <TouchableOpacity
+             style={[styles.confirmButton, (selectedSauces.length !== 2 || submitting) ? styles.disabledButton : null]}
              onPress={handleCheckout}
+             disabled={submitting}
            >
-             <Text style={styles.confirmText}>Pedir Agora e Saborear</Text>
+             <Text style={styles.confirmText}>{submitting ? 'Enviando...' : 'Pedir Agora e Saborear'}</Text>
            </TouchableOpacity>
         </View>
       </ScrollView>

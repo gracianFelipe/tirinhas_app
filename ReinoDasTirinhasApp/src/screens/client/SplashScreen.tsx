@@ -1,12 +1,58 @@
 import React, { useEffect, useRef } from 'react';
 import { StyleSheet, Animated, Image, View } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { theme } from '../../constants/theme';
+import { supabase } from '../../lib/supabase';
+import { RootStackParamList, User, UserRole } from '../../types';
 
-export default function SplashScreen({ navigation }: any) {
+type Props = NativeStackScreenProps<RootStackParamList, 'Splash'>;
+
+interface ProfileRow {
+  id: string;
+  name: string;
+  phone: string | null;
+  role: UserRole;
+}
+
+export default function SplashScreen({ navigation }: Props) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
 
   useEffect(() => {
+    const routeAfterAnimation = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigation.replace('Login');
+        return;
+      }
+
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('id, name, phone, role')
+        .eq('id', session.user.id)
+        .single<ProfileRow>();
+
+      if (error || !profile) {
+        await supabase.auth.signOut();
+        navigation.replace('Login');
+        return;
+      }
+
+      const user: User = {
+        id: profile.id,
+        email: session.user.email ?? '',
+        name: profile.name,
+        phone: profile.phone,
+        role: profile.role,
+      };
+
+      if (user.role === 'employee') {
+        navigation.replace('Dashboard', { user });
+      } else {
+        navigation.replace('Menu', { user });
+      }
+    };
+
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -19,22 +65,20 @@ export default function SplashScreen({ navigation }: any) {
         useNativeDriver: true,
       })
     ]).start(() => {
-      // Redireciona para o Login de clientes e funcionário
-      setTimeout(() => navigation.replace('Login'), 1200);
+      setTimeout(routeAfterAnimation, 1200);
     });
-  }, [fadeAnim, scaleAnim]);
+  }, [fadeAnim, scaleAnim, navigation]);
 
   return (
     <View style={styles.container}>
       <Animated.View style={[
-        styles.content, 
+        styles.content,
         { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }
       ]}>
-        {/* Referenciando logo2.jpg para forçar que o Expo quebre o cache antigo e leia sua nova imagem */}
-        <Image 
-          source={require('../../../assets/logo2.jpg')} 
-          style={styles.logo} 
-          resizeMode="contain" 
+        <Image
+          source={require('../../../assets/logo2.jpg')}
+          style={styles.logo}
+          resizeMode="contain"
         />
       </Animated.View>
     </View>
@@ -44,7 +88,6 @@ export default function SplashScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // Volta a usar a cor constante do theme.js (que você inteligentemente cravou pra #f6efdd)
     backgroundColor: theme.colors.background,
     justifyContent: 'center',
     alignItems: 'center',
@@ -55,7 +98,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   logo: {
-    // Imagem ganha um pouquinho mais de espaço para ficar fluida e parecer nativa
     width: 380,
     height: 380,
   },

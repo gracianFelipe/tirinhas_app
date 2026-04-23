@@ -1,22 +1,32 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, Alert } from 'react-native';
-import { useSQLiteContext } from 'expo-sqlite';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Feather } from '@expo/vector-icons';
 import { theme } from '../../constants/theme';
+import { supabase } from '../../lib/supabase';
+import { resolveProductImage } from '../../utils/productImages';
+import { Product, RootStackParamList } from '../../types';
 
-export default function MenuScreen({ route, navigation }: any) {
-  const db = useSQLiteContext();
-  const { user } = route.params || {};
-  const [products, setProducts] = useState<any[]>([]);
+type Props = NativeStackScreenProps<RootStackParamList, 'Menu'>;
+
+type SectionHeader = { id: string; type: 'header'; title: string };
+type ListEntry = Product | SectionHeader;
+
+export default function MenuScreen({ route, navigation }: Props) {
+  const user = route.params?.user;
+  const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
     const fetchProducts = async () => {
-      try {
-        const rows = await db.getAllAsync('SELECT * FROM Product');
-        setProducts(rows);
-      } catch (e) {
-        console.error(e);
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, description, price, category, image')
+        .order('id', { ascending: true });
+      if (error) {
+        console.error(error);
+        return;
       }
+      setProducts((data ?? []) as Product[]);
     };
     fetchProducts();
   }, []);
@@ -24,24 +34,10 @@ export default function MenuScreen({ route, navigation }: any) {
   const tirinhas = products.filter(p => p.category === 'Tirinha');
   const molhos = products.filter(p => p.category === 'Molho');
 
-  const resolveImage = (imageName: string) => {
-    switch (imageName) {
-      case 'tirinhas_300.png': return require('../../../assets/products/tirinhas_300.png');
-      case 'tirinhas_500.png': return require('../../../assets/products/tirinhas_500.png');
-      case 'tirinhas_700.png': return require('../../../assets/products/tirinhas_700.png');
-      case 'alho_limao.png': return require('../../../assets/products/alho_limao.png');
-      case 'baconese.png': return require('../../../assets/products/baconese.png');
-      case 'defumado.png': return require('../../../assets/products/defumado.png');
-      case 'ervas_finas.png': return require('../../../assets/products/ervas_finas.png');
-      case 'proteico.png': return require('../../../assets/products/proteico.png');
-      default: return require('../../../assets/logo2.jpg');
-    }
-  };
-
-  const renderItem = ({ item }: { item: any }) => {
+  const renderItem = ({ item }: { item: Product }) => {
     const isTirinha = item.category === 'Tirinha';
     return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.card}
       activeOpacity={isTirinha ? 0.7 : 1}
       onPress={() => {
@@ -49,12 +45,12 @@ export default function MenuScreen({ route, navigation }: any) {
           if (!user) {
             Alert.alert('Conta Necessária', 'Você precisa de uma conta de realeza para pedir nosso frango!', [{ text: 'Fazer Login Agora', onPress: () => navigation.replace('Splash') }]);
           } else {
-            navigation.navigate('OrderBuilder', { product: item, user: user });
+            navigation.navigate('OrderBuilder', { product: item, user });
           }
         }
       }}
     >
-      <Image source={resolveImage(item.image)} style={styles.cardImage} />
+      <Image source={resolveProductImage(item.image)} style={styles.cardImage} />
       <View style={styles.cardInfo}>
         <Text style={styles.cardTitle}>{item.name}</Text>
         <Text style={styles.cardDescription}>{item.description}</Text>
@@ -65,26 +61,44 @@ export default function MenuScreen({ route, navigation }: any) {
     );
   };
 
+  const listData: ListEntry[] = [
+    { id: 'header-tirinhas', type: 'header', title: 'Tirinhas Crocantes (Escolha 2 Molhos)' },
+    ...tirinhas,
+    { id: 'header-molhos', type: 'header', title: 'Molhos Premium Extras' },
+    ...molhos,
+  ];
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.homeButton} 
-          onPress={() => navigation.replace('Splash')}
+        <TouchableOpacity
+          style={styles.homeButton}
+          onPress={async () => {
+            await supabase.auth.signOut();
+            navigation.replace('Splash');
+          }}
         >
-          <Feather name="home" size={26} color={theme.colors.primaryDark} />
+          <Feather name="log-out" size={26} color={theme.colors.primaryDark} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Cardápio</Text>
+        {user && (
+          <TouchableOpacity
+            style={styles.ordersButton}
+            onPress={() => navigation.navigate('MyOrders', { user })}
+          >
+            <Feather name="clipboard" size={24} color={theme.colors.primaryDark} />
+          </TouchableOpacity>
+        )}
       </View>
-      
+
       <FlatList
-        data={[{id: 'header-tirinhas', type: 'header', title: 'Tirinhas Crocantes (Escolha 2 Molhos)'}, ...tirinhas, {id: 'header-molhos', type: 'header', title: 'Molhos Premium Extras'}, ...molhos]}
-        keyExtractor={(item: any) => item.id.toString()}
+        data={listData}
+        keyExtractor={(item) => item.id.toString()}
         renderItem={({item}) => {
-          if (item.type === 'header') {
+          if ('type' in item && item.type === 'header') {
             return <Text style={styles.sectionHeader}>{item.title}</Text>;
           }
-          return renderItem({item});
+          return renderItem({ item: item as Product });
         }}
         contentContainerStyle={{ paddingBottom: 40 }}
       />
@@ -109,6 +123,12 @@ const styles = StyleSheet.create({
   homeButton: {
     position: 'absolute',
     left: 16,
+    bottom: 18,
+    padding: 6,
+  },
+  ordersButton: {
+    position: 'absolute',
+    right: 16,
     bottom: 18,
     padding: 6,
   },

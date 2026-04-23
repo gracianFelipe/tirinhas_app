@@ -1,73 +1,103 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform, ScrollView, TouchableWithoutFeedback, Keyboard, LayoutAnimation, UIManager } from 'react-native';
-import { useSQLiteContext } from 'expo-sqlite';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { theme } from '../../constants/theme';
-import * as SQLite from 'expo-sqlite';
+import { supabase } from '../../lib/supabase';
+import { RootStackParamList, User, UserRole } from '../../types';
 
-export default function LoginScreen({ navigation }: any) {
-  const db = useSQLiteContext();
+type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
+
+interface ProfileRow {
+  id: string;
+  name: string;
+  phone: string | null;
+  role: UserRole;
+}
+
+export default function LoginScreen({ navigation }: Props) {
   const [isLogin, setIsLogin] = useState(true);
-  
-  const [login, setLogin] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
 
-  const phoneRef = useRef<TextInput>(null);
-  const loginRef = useRef<TextInput>(null);
-  const passwordRef = useRef<TextInput>(null);
+  const goAfterAuth = async (authUserId: string, authEmail: string) => {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('id, name, phone, role')
+      .eq('id', authUserId)
+      .single<ProfileRow>();
 
-  const executeAuth = async () => {
-    if (!login || !password) {
-      Alert.alert('Atenção', 'Preencha o Login e a Senha para prosseguir.');
+    if (error || !profile) {
+      console.error(error);
+      Alert.alert('Ops', 'Não foi possível carregar seu perfil. Tente novamente.');
       return;
     }
 
+    const user: User = {
+      id: profile.id,
+      email: authEmail,
+      name: profile.name,
+      phone: profile.phone,
+      role: profile.role,
+    };
+
+    if (user.role === 'employee') {
+      navigation.replace('Dashboard', { user });
+    } else {
+      navigation.replace('Menu', { user });
+    }
+  };
+
+  const executeAuth = async () => {
+    if (!email || !password) {
+      Alert.alert('Atenção', 'Preencha o e-mail e a senha para prosseguir.');
+      return;
+    }
+
+    setLoading(true);
     try {
-      // O DB agora vem do contexto superior (useSQLiteContext)
       if (isLogin) {
-        // Fluxo de Login
-        const result: any = await db.getFirstAsync('SELECT * FROM User WHERE login = ? AND password = ?', [login, password]);
-        if (result) {
-          if (result.role === 'employee') {
-            navigation.replace('Dashboard', { user: result });
-          } else {
-            navigation.replace('Menu', { user: result });
-          }
-        } else {
-          Alert.alert('Acesso Negado', 'Credenciais inválidas. Verifique seu login e senha.');
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error || !data.user) {
+          Alert.alert('Acesso Negado', error?.message ?? 'Credenciais inválidas.');
+          return;
         }
+        await goAfterAuth(data.user.id, data.user.email ?? email);
       } else {
-        // Fluxo de Cadastro
         if (!name) {
           Alert.alert('Atenção', 'Rainhas e Reis precisam de nome. Preencha o seu nome!');
           return;
         }
-        
-        // Impede logins repetidos
-        const exists: any = await db.getFirstAsync('SELECT id FROM User WHERE login = ?', [login]);
-        if (exists) {
-          Alert.alert('Ops', 'Nome de usuário indisponível. Escolha outro Login.');
+
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { name, phone, role: 'client' },
+          },
+        });
+        if (error) {
+          Alert.alert('Erro no cadastro', error.message);
           return;
         }
-
-        const insert = await db.runAsync(
-          'INSERT INTO User (login, password, role, name, phone) VALUES (?, ?, ?, ?, ?)',
-          [login, password, 'client', name, phone]
-        );
-
-        const newUser = { id: insert.lastInsertRowId, login, role: 'client', name, phone };
-        Alert.alert('Bem-vindo à Realeza!', 'Conta de cliente criada com sucesso!', [
-          { text: 'Acessar o Cardápio', onPress: () => navigation.replace('Menu', { user: newUser }) }
-        ]);
+        if (!data.session || !data.user) {
+          Alert.alert(
+            'Quase lá!',
+            'Conta criada. Confirme seu e-mail (ou desative a confirmação no painel do Supabase) e faça login.'
+          );
+          setIsLogin(true);
+          return;
+        }
+        await goAfterAuth(data.user.id, data.user.email ?? email);
       }
-    } catch (error) {
-      console.error(error);
-      Alert.alert('Erro', 'Houve um problema de conexão com a Base de Dados local.');
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Erro', 'Houve um problema de conexão. Tente de novo.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -98,9 +128,9 @@ export default function LoginScreen({ navigation }: any) {
         <View style={styles.card}>
           {!isLogin && (
             <>
-              <TextInput 
-                style={styles.input} 
-                placeholder="Seu Nome Completo" 
+              <TextInput
+                style={styles.input}
+                placeholder="Seu Nome Completo"
                 placeholderTextColor={theme.colors.textSecondary}
                 value={name}
                 onChangeText={setName}
@@ -108,10 +138,9 @@ export default function LoginScreen({ navigation }: any) {
                 onSubmitEditing={() => phoneRef.current?.focus()}
                 blurOnSubmit={false}
               />
-              <TextInput 
-                ref={phoneRef}
-                style={styles.input} 
-                placeholder="Seu Telefone (Opcional)" 
+              <TextInput
+                style={styles.input}
+                placeholder="Seu Telefone (Opcional)"
                 keyboardType="phone-pad"
                 placeholderTextColor={theme.colors.textSecondary}
                 value={phone}
@@ -123,22 +152,18 @@ export default function LoginScreen({ navigation }: any) {
             </>
           )}
 
-          <TextInput 
-            ref={loginRef}
-            style={styles.input} 
-            placeholder="Nome de Usuário (Login)" 
+          <TextInput
+            style={styles.input}
+            placeholder="E-mail"
             autoCapitalize="none"
+            keyboardType="email-address"
             placeholderTextColor={theme.colors.textSecondary}
-            value={login}
-            onChangeText={setLogin}
-            returnKeyType="next"
-            onSubmitEditing={() => passwordRef.current?.focus()}
-            blurOnSubmit={false}
+            value={email}
+            onChangeText={setEmail}
           />
-          <TextInput 
-            ref={passwordRef}
-            style={styles.input} 
-            placeholder="Sua Senha" 
+          <TextInput
+            style={styles.input}
+            placeholder="Sua Senha"
             secureTextEntry
             placeholderTextColor={theme.colors.textSecondary}
             value={password}
@@ -147,8 +172,14 @@ export default function LoginScreen({ navigation }: any) {
             onSubmitEditing={executeAuth}
           />
 
-          <TouchableOpacity style={styles.primaryButton} onPress={executeAuth}>
-            <Text style={styles.primaryButtonText}>{isLogin ? 'Acessar o Salão' : 'Registrar no Reino'}</Text>
+          <TouchableOpacity
+            style={[styles.primaryButton, loading && styles.primaryButtonDisabled]}
+            onPress={executeAuth}
+            disabled={loading}
+          >
+            <Text style={styles.primaryButtonText}>
+              {loading ? 'Aguarde...' : isLogin ? 'Acessar o Salão' : 'Registrar no Reino'}
+            </Text>
           </TouchableOpacity>
           </View>
         </ScrollView>
@@ -169,5 +200,6 @@ const styles = StyleSheet.create({
   card: { backgroundColor: theme.colors.surface, padding: theme.spacing.l, borderRadius: 16, elevation: 4, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10 },
   input: { height: 50, backgroundColor: theme.colors.background, borderRadius: 8, paddingHorizontal: 16, marginBottom: 16, borderWidth: 1, borderColor: '#EFEFEF', color: theme.colors.textPrimary },
   primaryButton: { backgroundColor: theme.colors.primary, paddingVertical: 14, borderRadius: 8, alignItems: 'center', marginTop: 10 },
+  primaryButtonDisabled: { backgroundColor: '#CCC' },
   primaryButtonText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 }
 });
