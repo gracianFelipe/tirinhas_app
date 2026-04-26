@@ -13,6 +13,40 @@ type Props = NativeStackScreenProps<RootStackParamList, 'OrderBuilder'>;
 const DEFAULT_FREE_SAUCES = 2;
 const SUCCESS_LOTTIE = { uri: 'https://lottie.host/74f1778c-0f9c-4654-8e11-e737119e8834/A9Wd0R4V2E.json' };
 
+const DRINK_GROUPS = [
+  { label: '🥤 Latas', match: (n: string) => n.toLowerCase().includes('lata') && !n.toLowerCase().includes('soda') && !n.toLowerCase().includes('limoneto') },
+  { label: '🍼 Garrafinhas 500ml', match: (n: string) => (n.includes('500ml') || n.includes('500 ml')) && !n.toLowerCase().includes('h2o') },
+  { label: '🧊 Refri 1L', match: (n: string) => n.toLowerCase().includes('1l') },
+  { label: '🌊 Refri 2L', match: (n: string) => n.toLowerCase().includes('2l') },
+  { label: '✨ Especiais (Sodas, H2O, Limoneto)', match: (n: string) => 
+      n.toLowerCase().includes('soda') || n.toLowerCase().includes('h2o') || n.toLowerCase().includes('limoneto') 
+  },
+];
+
+const ACOMP_GROUPS = [
+  { label: '🍟 Batatas Fritas', match: (n: string) => n.toLowerCase().includes('frit') && !n.toLowerCase().includes('crocant') && !n.toLowerCase().includes('supremo') },
+  { label: '🥇 Supremo de Batata', match: (n: string) => n.toLowerCase().includes('supremo') },
+  { label: '🍿 Crocantonas', match: (n: string) => n.toLowerCase().includes('crocant') },
+];
+
+function AccordionSection({ title, children, defaultOpen = false }: { title: string, children: React.ReactNode, defaultOpen?: boolean }) {
+  const { theme } = useTheme();
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  return (
+    <View style={{ marginBottom: 4 }}>
+      <TouchableOpacity
+        style={[s.accordionHeader, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.background }]}
+        onPress={() => setIsOpen(!isOpen)}
+        activeOpacity={0.7}
+      >
+        <Text style={[s.sectionHeader, { color: theme.colors.primaryDark }]}>{title}</Text>
+        <Feather name={isOpen ? "chevron-up" : "chevron-down"} size={20} color={theme.colors.primaryDark} />
+      </TouchableOpacity>
+      {isOpen && <View style={{ paddingBottom: 10 }}>{children}</View>}
+    </View>
+  );
+}
+
 export default function OrderBuilderScreen({ route, navigation }: Props) {
   const { theme, isDark } = useTheme();
   const { product, user } = route.params;
@@ -33,22 +67,13 @@ export default function OrderBuilderScreen({ route, navigation }: Props) {
 
   useEffect(() => {
     const fetchUserReward = async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('has_pending_reward')
-        .eq('id', user.id)
-        .single();
-      if (data?.has_pending_reward) {
-        setHasPendingReward(true);
-      }
+      const { data } = await supabase.from('profiles').select('has_pending_reward').eq('id', user.id).single();
+      if (data?.has_pending_reward) setHasPendingReward(true);
     };
 
     const fetchExtras = async () => {
-      const { data } = await supabase
-        .from('products')
-        .select('id, name, description, price, category, image')
-        .in('category', ['Molho', 'Acompanhamento', 'Bebida'])
-        .order('id', { ascending: true });
+      const { data } = await supabase.from('products').select('id, name, description, price, category, image')
+        .in('category', ['Molho', 'Acompanhamento', 'Bebida']).order('id', { ascending: true });
       if (data) {
         const productsList = data as Product[];
         setSauces(productsList.filter(p => p.category === 'Molho'));
@@ -61,107 +86,76 @@ export default function OrderBuilderScreen({ route, navigation }: Props) {
     fetchExtras();
   }, [user.id]);
 
-  const getSauceExtraPrice = (id: number) => {
-    const s = sauces.find(s => s.id === id);
-    return s?.price ?? 3.50;
-  };
+  const toggleSauce = (id: number) => setSelectedSauces(p => p.includes(id) ? p.filter(s => s !== id) : [...p, id]);
+  const toggleAcomp = (id: number) => setSelectedAcomp(p => p.includes(id) ? p.filter(s => s !== id) : [...p, id]);
+  const toggleBebida = (id: number) => setSelectedBebidas(p => p.includes(id) ? p.filter(s => s !== id) : [...p, id]);
 
-  const toggleSauce = (id: number) =>
-    setSelectedSauces(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
-
-  const toggleAcomp = (id: number) =>
-    setSelectedAcomp(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
-
-  const toggleBebida = (id: number) =>
-    setSelectedBebidas(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
-
-  const extraSauceCost = selectedSauces.slice(freeSaucesLimit).reduce((sum, id) => sum + getSauceExtraPrice(id), 0);
-  const acompCost = selectedAcomp.reduce((sum, id) => {
-    const a = acompanhamentos.find(a => a.id === id);
-    return sum + (a?.price ?? 0);
-  }, 0);
-  const bebidaCost = selectedBebidas.reduce((sum, id) => {
-    const b = bebidas.find(b => b.id === id);
-    return sum + (b?.price ?? 0);
-  }, 0);
-
+  const extraSauceCost = selectedSauces.slice(freeSaucesLimit).reduce((sum, id) => sum + (sauces.find(s => s.id === id)?.price ?? 3.5), 0);
   const finalAcompCost = selectedAcomp.reduce((sum, id) => {
     const a = acompanhamentos.find(a => a.id === id);
-    if (hasPendingReward && a?.name.toLowerCase().includes('fritas p')) return sum; // Free!
+    if (hasPendingReward && a?.name.toLowerCase().includes('fritas p')) return sum;
     return sum + (a?.price ?? 0);
   }, 0);
+  const bebidaCost = selectedBebidas.reduce((sum, id) => sum + (bebidas.find(b => b.id === id)?.price ?? 0), 0);
 
   const subtotal = product.price + extraSauceCost + finalAcompCost + bebidaCost;
-  
-  const hasBatata = selectedAcomp.some(id => {
-    const a = acompanhamentos.find(item => item.id === id);
-    return a?.name.toLowerCase().includes('frit');
-  });
-  const hasBebida = selectedBebidas.length > 0;
-  const isComboReal = product.category === 'Tirinha' && hasBatata && hasBebida;
-  
+  const isComboReal = product.category === 'Tirinha' && selectedAcomp.some(id => acompanhamentos.find(i => i.id === id)?.name.toLowerCase().includes('frit')) && selectedBebidas.length > 0;
   const discount = isComboReal ? subtotal * 0.1 : 0;
   const totalPrice = subtotal - discount;
 
-
   const handleCheckout = async () => {
-    if (selectedSauces.length < 1) {
-      Alert.alert('Atenção', 'Escolha pelo menos 1 molho.');
-      return;
-    }
+    if (selectedSauces.length < 1) { Alert.alert('Atenção', 'Escolha pelo menos 1 molho.'); return; }
     setSubmitting(true);
     try {
       const orderNumber = 'RT-' + Math.floor(Math.random() * 10000);
-      const { data: orderRow, error: orderError } = await supabase
-        .from('orders').insert({
-          user_id: user.id, order_number: orderNumber,
-          status: 'Recebido na Cozinha', total_amount: totalPrice,
-        }).select('id').single<{ id: number }>();
+      const { data: orderRow, error: orderError } = await supabase.from('orders').insert({
+          user_id: user.id, order_number: orderNumber, status: 'Recebido na Cozinha', total_amount: totalPrice,
+      }).select('id').single<{ id: number }>();
       if (orderError || !orderRow) throw orderError;
-      
-      if (hasPendingReward) {
-        await supabase.from('profiles').update({ has_pending_reward: false }).eq('id', user.id);
-      }
+      if (hasPendingReward) await supabase.from('profiles').update({ has_pending_reward: false }).eq('id', user.id);
 
       const sauceItems = selectedSauces.map((id, i) => ({
-        order_id: orderRow.id, product_id: id, quantity: 1,
-        unit_price: i < freeSaucesLimit ? 0 : getSauceExtraPrice(id),
+        order_id: orderRow.id, product_id: id, quantity: 1, unit_price: i < freeSaucesLimit ? 0 : (sauces.find(s => s.id === id)?.price ?? 3.5),
       }));
       const acompItems = selectedAcomp.map(id => {
         const a = acompanhamentos.find(item => item.id === id);
-        const isFreePotato = hasPendingReward && a?.name.toLowerCase().includes('fritas p');
-        return {
-          order_id: orderRow.id, product_id: id, quantity: 1,
-          unit_price: isFreePotato ? 0 : (a?.price ?? 0),
-        };
+        return { order_id: orderRow.id, product_id: id, quantity: 1, unit_price: (hasPendingReward && a?.name.toLowerCase().includes('fritas p')) ? 0 : (a?.price ?? 0) };
       });
+      const bebidaItems = selectedBebidas.map(id => ({ order_id: orderRow.id, product_id: id, quantity: 1, unit_price: bebidas.find(b => b.id === id)?.price ?? 0 }));
 
-      const bebidaItems = selectedBebidas.map(id => ({
-        order_id: orderRow.id, product_id: id, quantity: 1,
-        unit_price: bebidas.find(b => b.id === id)?.price ?? 0,
-      }));
-
-      const { error: itemsError } = await supabase.from('order_items').insert([
-        { order_id: orderRow.id, product_id: product.id, quantity: 1, unit_price: product.price },
-        ...sauceItems, ...acompItems, ...bebidaItems,
-      ]);
-      if (itemsError) throw itemsError;
-
+      await supabase.from('order_items').insert([{ order_id: orderRow.id, product_id: product.id, quantity: 1, unit_price: product.price }, ...sauceItems, ...acompItems, ...bebidaItems]);
       setOrderNum(orderNumber);
       setShowSuccess(true);
-    } catch (e) {
-      console.error(e);
-      Alert.alert('Erro', 'Houve um problema. Tente novamente.');
-    } finally { setSubmitting(false); }
+    } catch (e) { Alert.alert('Erro', 'Tente novamente.'); } finally { setSubmitting(false); }
   };
 
+  const renderCard = (item: Product, type: 'sauce' | 'acomp' | 'bebida') => {
+    const isSelected = type === 'sauce' ? selectedSauces.includes(item.id) : type === 'acomp' ? selectedAcomp.includes(item.id) : selectedBebidas.includes(item.id);
+    const isPaidSauce = type === 'sauce' && isSelected && selectedSauces.indexOf(item.id) >= freeSaucesLimit;
+    const isFreePotato = type === 'acomp' && hasPendingReward && item.name.toLowerCase().includes('fritas p');
+
+    return (
+      <TouchableOpacity 
+        key={item.id} 
+        style={[s.itemCard, { backgroundColor: theme.colors.surface }, isSelected && s.itemCardSel, isPaidSauce && s.itemCardExtra]} 
+        onPress={() => type === 'sauce' ? toggleSauce(item.id) : type === 'acomp' ? toggleAcomp(item.id) : toggleBebida(item.id)}
+      >
+        <Image source={resolveProductImage(item.image)} style={s.itemImage} />
+        <View style={{ flex: 1 }}>
+          <Text style={[s.itemName, { color: theme.colors.textPrimary }, isSelected && s.textSel]}>{item.name}</Text>
+          {isPaidSauce && <Text style={s.extraBadge}>+ R$ {item.price.toFixed(2)}</Text>}
+          {type === 'sauce' && isSelected && !isPaidSauce && <Text style={s.freeBadge}>✓ Incluso</Text>}
+          {type !== 'sauce' && (isFreePotato ? <Text style={s.freeBadge}>✓ GRÁTIS (Prêmio Real)</Text> : <Text style={[s.itemPrice, { color: theme.colors.primary }]}>R$ {item.price.toFixed(2)}</Text>)}
+        </View>
+        <View style={[s.radio, isSelected && s.radioSel]} />
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={[s.container, { backgroundColor: theme.colors.background }]}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        <TouchableOpacity style={s.backButton} onPress={() => navigation.goBack()}>
-          <Text style={[s.backButtonText, { color: theme.colors.primaryDark }]}>← Voltar</Text>
-        </TouchableOpacity>
+        <TouchableOpacity style={s.backButton} onPress={() => navigation.goBack()}><Text style={[s.backButtonText, { color: theme.colors.primaryDark }]}>← Voltar</Text></TouchableOpacity>
         <Text style={[s.headerTitle, { color: theme.colors.textPrimary }]}>Montar Combinação</Text>
 
         {hasPendingReward && (
@@ -171,7 +165,6 @@ export default function OrderBuilderScreen({ route, navigation }: Props) {
           </View>
         )}
 
-        {/* Main product */}
         <View style={[s.mainProduct, { backgroundColor: theme.colors.surface }]}>
           <Image source={resolveProductImage(product.image)} style={s.productImage} resizeMode="contain" />
           <View style={{ flex: 1 }}>
@@ -181,147 +174,55 @@ export default function OrderBuilderScreen({ route, navigation }: Props) {
           </View>
         </View>
 
-        {/* Suggestion Banner */}
         {selectedBebidas.length === 0 && bebidas.length > 0 && (
-          <TouchableOpacity 
-            style={s.suggestionBanner} 
-            onPress={() => {
-              setShowBebidas(true);
-              const suggestion = bebidas.find(b => b.name.toLowerCase().includes('soda maracujá')) || bebidas[0];
-              toggleBebida(suggestion.id);
-            }}
-          >
+          <TouchableOpacity style={s.suggestionBanner} onPress={() => { setShowBebidas(true); toggleBebida((bebidas.find(b => b.name.toLowerCase().includes('soda maracujá')) || bebidas[0]).id); }}>
             <View style={s.suggestionContent}>
-              <View style={s.suggestionIconBox}>
-                <Feather name="star" size={18} color="#FFF" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.suggestionTitle}>Dica do Chef 👨‍🍳</Text>
-                <Text style={s.suggestionText}>
-                  Uma Soda Italiana geladinha combina muito com Tirinhas!
-                </Text>
-              </View>
+              <View style={s.suggestionIconBox}><Feather name="star" size={18} color="#FFF" /></View>
+              <View style={{ flex: 1 }}><Text style={s.suggestionTitle}>Dica do Chef 👨‍🍳</Text><Text style={s.suggestionText}>Uma Soda Italiana geladinha combina muito com Tirinhas!</Text></View>
               <Text style={s.suggestionAdd}>+ ADD</Text>
             </View>
           </TouchableOpacity>
         )}
 
-        {/* Sauces */}
         <Text style={[s.sectionTitle, { color: theme.colors.textPrimary }]}>Molhos:</Text>
-        <Text style={[s.counter, { color: theme.colors.primary }]}>
-          {selectedSauces.length} selecionado{selectedSauces.length !== 1 ? 's' : ''}
-          {selectedSauces.length > freeSaucesLimit
-            ? ` (${selectedSauces.length - freeSaucesLimit} extra${selectedSauces.length - freeSaucesLimit > 1 ? 's' : ''})`
-            : ` (${Math.max(0, freeSaucesLimit - selectedSauces.length)} grátis restante${freeSaucesLimit - selectedSauces.length !== 1 ? 's' : ''})`}
-        </Text>
-        <View style={s.list}>
-          {sauces.map((sauce, i) => {
-            const sel = selectedSauces.includes(sauce.id);
-            const pos = selectedSauces.indexOf(sauce.id);
-            const isPaid = sel && pos >= freeSaucesLimit;
-            return (
-              <TouchableOpacity 
-                key={sauce.id} 
-                style={[s.itemCard, { backgroundColor: theme.colors.surface }, sel && s.itemCardSel, isPaid && s.itemCardExtra]} 
-                onPress={() => toggleSauce(sauce.id)}
-              >
-                <Image source={resolveProductImage(sauce.image)} style={s.itemImage} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.itemName, { color: theme.colors.textPrimary }, sel && s.textSel]}>{sauce.name}</Text>
-                  {isPaid && <Text style={s.extraBadge}>+ R$ {getSauceExtraPrice(sauce.id).toFixed(2)}</Text>}
-                  {sel && !isPaid && <Text style={s.freeBadge}>✓ Incluso</Text>}
-                </View>
-                <View style={[s.radio, sel && s.radioSel]} />
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        <Text style={[s.counter, { color: theme.colors.primary }]}>{selectedSauces.length} selecionado(s) {selectedSauces.length > freeSaucesLimit ? `(${selectedSauces.length - freeSaucesLimit} extra)` : `(${freeSaucesLimit - selectedSauces.length} grátis)`}</Text>
+        <View style={s.list}>{sauces.map(s => renderCard(s, 'sauce'))}</View>
 
-        {/* Accompaniments */}
         <Text style={[s.sectionTitle, { color: theme.colors.textPrimary }]}>Acompanhamentos (Opcional):</Text>
         <View style={s.list}>
-          {acompanhamentos.map(a => {
-            const sel = selectedAcomp.includes(a.id);
-            const isFreePotato = hasPendingReward && a.name.toLowerCase().includes('fritas p');
+          {ACOMP_GROUPS.map((group, idx) => {
+            const items = acompanhamentos.filter(a => group.match(a.name));
+            if (items.length === 0) return null;
             return (
-              <TouchableOpacity 
-                key={a.id} 
-                style={[s.itemCard, { backgroundColor: theme.colors.surface }, sel && s.itemCardSel]} 
-                onPress={() => toggleAcomp(a.id)}
-              >
-                <Image source={resolveProductImage(a.image)} style={s.itemImage} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[s.itemName, { color: theme.colors.textPrimary }, sel && s.textSel]}>{a.name}</Text>
-                  {isFreePotato ? (
-                    <Text style={s.freeBadge}>✓ GRÁTIS (Prêmio Real)</Text>
-                  ) : (
-                    <Text style={[s.itemPrice, { color: theme.colors.primary }]}>R$ {a.price.toFixed(2)}</Text>
-                  )}
-                </View>
-                <View style={[s.radio, sel && s.radioSel]} />
-              </TouchableOpacity>
+              <AccordionSection key={group.label} title={group.label} defaultOpen={idx === 0}>
+                {items.map(p => renderCard(p, 'acomp'))}
+              </AccordionSection>
             );
           })}
         </View>
 
-        {/* Drinks toggle */}
-        <TouchableOpacity style={[s.drinksToggle, { backgroundColor: theme.colors.accent }]} onPress={() => setShowBebidas(!showBebidas)}>
-          <Text style={s.drinksToggleText}>🥤 {showBebidas ? 'Ocultar Bebidas' : 'Adicionar Bebida?'}</Text>
-        </TouchableOpacity>
-
+        <TouchableOpacity style={[s.drinksToggle, { backgroundColor: theme.colors.accent }]} onPress={() => setShowBebidas(!showBebidas)}><Text style={s.drinksToggleText}>🥤 {showBebidas ? 'Ocultar Bebidas' : 'Adicionar Bebida?'}</Text></TouchableOpacity>
         {showBebidas && (
           <View style={s.list}>
-            {bebidas.map(b => {
-              const sel = selectedBebidas.includes(b.id);
+            {DRINK_GROUPS.map((group, idx) => {
+              const items = bebidas.filter(b => group.match(b.name));
+              if (items.length === 0) return null;
               return (
-                <TouchableOpacity 
-                  key={b.id} 
-                  style={[s.itemCard, { backgroundColor: theme.colors.surface }, sel && s.itemCardSel]} 
-                  onPress={() => toggleBebida(b.id)}
-                >
-                  <Image source={resolveProductImage(b.image)} style={s.itemImage} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[s.itemName, { color: theme.colors.textPrimary }, sel && s.textSel]}>{b.name}</Text>
-                    <Text style={[s.itemPrice, { color: theme.colors.primary }]}>R$ {b.price.toFixed(2)}</Text>
-                  </View>
-                  <View style={[s.radio, sel && s.radioSel]} />
-                </TouchableOpacity>
+                <AccordionSection key={group.label} title={group.label} defaultOpen={idx === 0}>
+                  {items.map(p => renderCard(p, 'bebida'))}
+                </AccordionSection>
               );
             })}
           </View>
         )}
 
-        {/* Checkout */}
         <View style={[s.checkoutBox, { backgroundColor: theme.colors.surface }]}>
-          {isComboReal && (
-            <View style={s.comboBadge}>
-              <Feather name="trending-down" size={16} color="#27ae60" />
-              <Text style={s.comboBadgeText}>Combo Real: - R$ {discount.toFixed(2)} (10%)</Text>
-            </View>
-          )}
-          <View style={s.totalRow}>
-            <View>
-              <Text style={[s.totalLabel, { color: theme.colors.textPrimary }]}>Total:</Text>
-              {isComboReal && <Text style={s.subtotalText}>R$ {subtotal.toFixed(2)}</Text>}
-            </View>
-            <Text style={[s.totalValue, { color: theme.colors.primary }]}>R$ {totalPrice.toFixed(2)}</Text>
-          </View>
-
-          <TouchableOpacity
-            style={[s.confirmButton, { backgroundColor: theme.colors.primary }, (selectedSauces.length < 1 || submitting) && s.disabledButton]}
-            onPress={handleCheckout} disabled={submitting || selectedSauces.length < 1}>
-            <Text style={s.confirmText}>{submitting ? 'Enviando...' : 'Confirmar Pedido'}</Text>
-          </TouchableOpacity>
+          {isComboReal && <View style={s.comboBadge}><Feather name="trending-down" size={16} color="#27ae60" /><Text style={s.comboBadgeText}>Combo Real: - R$ {discount.toFixed(2)} (10%)</Text></View>}
+          <View style={s.totalRow}><View><Text style={[s.totalLabel, { color: theme.colors.textPrimary }]}>Total:</Text>{isComboReal && <Text style={s.subtotalText}>R$ {subtotal.toFixed(2)}</Text>}</View><Text style={[s.totalValue, { color: theme.colors.primary }]}>R$ {totalPrice.toFixed(2)}</Text></View>
+          <TouchableOpacity style={[s.confirmButton, { backgroundColor: theme.colors.primary }, (selectedSauces.length < 1 || submitting) && s.disabledButton]} onPress={handleCheckout} disabled={submitting || selectedSauces.length < 1}><Text style={s.confirmText}>{submitting ? 'Enviando...' : 'Confirmar Pedido'}</Text></TouchableOpacity>
         </View>
       </ScrollView>
-
-      <LottieModal
-        visible={showSuccess}
-        source={SUCCESS_LOTTIE}
-        title="Pedido Enviado!"
-        subtitle={`Ordem ${orderNum} já está na nossa forja, ${user.name}!`}
-        onClose={() => navigation.reset({ index: 0, routes: [{ name: 'Menu', params: { user } }] })}
-      />
+      <LottieModal visible={showSuccess} source={SUCCESS_LOTTIE} title="Pedido Enviado!" subtitle={`Ordem ${orderNum} já está na nossa forja, ${user.name}!`} onClose={() => navigation.reset({ index: 0, routes: [{ name: 'Menu', params: { user } }] })} />
     </View>
   );
 }
@@ -371,4 +272,6 @@ const s = StyleSheet.create({
   confirmButton: { paddingVertical: 14, borderRadius: 8, alignItems: 'center' },
   disabledButton: { backgroundColor: '#CCC' },
   confirmText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
+  sectionHeader: { fontSize: 16, fontWeight: 'bold' },
+  accordionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12, marginTop: 8, borderBottomWidth: 1 },
 });
