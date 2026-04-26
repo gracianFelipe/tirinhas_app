@@ -8,7 +8,7 @@ export interface User {
   phone?: string | null;
 }
 
-export type ProductCategory = 'Tirinha' | 'Molho';
+export type ProductCategory = 'Tirinha' | 'Molho' | 'Acompanhamento' | 'Barca' | 'Bebida';
 
 export interface Product {
   id: number;
@@ -24,6 +24,9 @@ export type RootStackParamList = {
   Login: undefined;
   Menu: { user?: User } | undefined;
   OrderBuilder: { product: Product; user: User };
+  AcompanhamentoOrder: { product: Product; user: User };
+  BarcaOrder: { product: Product; user: User };
+  BebidaOrder: { product: Product; user: User };
   Dashboard: { user: User };
   MyOrders: { user: User };
 };
