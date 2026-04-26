@@ -17,12 +17,33 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'bebidas', label: '🥤 Bebidas' },
 ];
 
+function AccordionSection({ title, children, defaultOpen = false }: { title: string, children: React.ReactNode, defaultOpen?: boolean }) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  return (
+    <View style={{ marginBottom: 4 }}>
+      <TouchableOpacity
+        style={s.accordionHeader}
+        onPress={() => setIsOpen(!isOpen)}
+        activeOpacity={0.7}
+      >
+        <Text style={s.sectionHeader}>{title}</Text>
+        <Feather name={isOpen ? "chevron-up" : "chevron-down"} size={20} color={theme.colors.primaryDark} />
+      </TouchableOpacity>
+      {isOpen && <View style={{ paddingBottom: 10 }}>{children}</View>}
+    </View>
+  );
+}
+
 const DRINK_GROUPS = [
-  { label: 'Latas', match: (n: string) => n.toLowerCase().includes('lata') },
-  { label: 'Garrafinhas 500ml', match: (n: string) => n.includes('500ml') },
-  { label: 'Refri 1L', match: (n: string) => n.includes('1L') },
-  { label: 'Refri 2L', match: (n: string) => n.includes('2L') },
-  { label: 'Sodas Italianas', match: (n: string) => n.toLowerCase().includes('soda') },
+  { label: '🥤 Latas', match: (n: string) => n.toLowerCase().includes('lata') && !n.toLowerCase().includes('soda') && !n.toLowerCase().includes('limoneto') },
+  { label: '🍼 Garrafinhas 500ml', match: (n: string) => (n.includes('500ml') || n.includes('500 ml')) && !n.toLowerCase().includes('h2o') },
+  { label: '🧊 Refri 1L', match: (n: string) => n.toLowerCase().includes('1l') },
+  { label: '🌊 Refri 2L', match: (n: string) => n.toLowerCase().includes('2l') },
+  { label: '✨ Especiais (Sodas, H2O, Limoneto)', match: (n: string) => 
+      n.toLowerCase().includes('soda') || 
+      n.toLowerCase().includes('h2o') || 
+      n.toLowerCase().includes('limoneto') 
+  },
 ];
 
 export default function MenuScreen({ route, navigation }: Props) {
@@ -73,10 +94,12 @@ export default function MenuScreen({ route, navigation }: Props) {
       const molhos = byCategory('Molho');
       return (
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-          <Text style={s.sectionHeader}>Tirinhas Crocantes (2 molhos inclusos)</Text>
-          {tirinhas.map(p => <View key={p.id}>{renderCard(p)}</View>)}
-          <Text style={s.sectionHeader}>Molhos Premium</Text>
-          {molhos.map(p => <View key={p.id}>{renderCard(p)}</View>)}
+          <AccordionSection title="🍗 Tirinhas Crocantes" defaultOpen>
+            {tirinhas.map(p => <View key={p.id}>{renderCard(p)}</View>)}
+          </AccordionSection>
+          <AccordionSection title="🍯 Molhos Premium">
+            {molhos.map(p => <View key={p.id}>{renderCard(p)}</View>)}
+          </AccordionSection>
         </ScrollView>
       );
     }
@@ -85,18 +108,29 @@ export default function MenuScreen({ route, navigation }: Props) {
       const barcas = byCategory('Barca');
       return (
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-          <Text style={s.sectionHeader}>Combos Barca</Text>
-          {barcas.map(p => <View key={p.id}>{renderCard(p)}</View>)}
+          <AccordionSection title="🚢 Combos Barca" defaultOpen>
+            {barcas.map(p => <View key={p.id}>{renderCard(p)}</View>)}
+          </AccordionSection>
         </ScrollView>
       );
     }
 
     if (activeTab === 'acompanhamentos') {
       const acomp = byCategory('Acompanhamento');
+      const batatas   = acomp.filter(p => p.name.toLowerCase().includes('frit') && !p.name.toLowerCase().includes('crocant') && !p.name.toLowerCase().includes('supremo'));
+      const supremo   = acomp.filter(p => p.name.toLowerCase().includes('supremo'));
+      const crocant   = acomp.filter(p => p.name.toLowerCase().includes('crocant'));
       return (
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-          <Text style={s.sectionHeader}>Acompanhamentos</Text>
-          {acomp.map(p => <View key={p.id}>{renderCard(p)}</View>)}
+          <AccordionSection title="🍟 Batatas Fritas" defaultOpen>
+            {batatas.map(p => <View key={p.id}>{renderCard(p)}</View>)}
+          </AccordionSection>
+          <AccordionSection title="🥇 Supremo de Batata">
+            {supremo.map(p => <View key={p.id}>{renderCard(p)}</View>)}
+          </AccordionSection>
+          <AccordionSection title="🍿 Crocantonas">
+            {crocant.map(p => <View key={p.id}>{renderCard(p)}</View>)}
+          </AccordionSection>
         </ScrollView>
       );
     }
@@ -105,14 +139,13 @@ export default function MenuScreen({ route, navigation }: Props) {
       const bebidas = byCategory('Bebida');
       return (
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-          {DRINK_GROUPS.map(group => {
+          {DRINK_GROUPS.map((group, idx) => {
             const items = bebidas.filter(b => group.match(b.name));
             if (items.length === 0) return null;
             return (
-              <View key={group.label}>
-                <Text style={s.sectionHeader}>{group.label}</Text>
+              <AccordionSection key={group.label} title={group.label} defaultOpen={idx === 0}>
                 {items.map(p => <View key={p.id}>{renderCard(p)}</View>)}
-              </View>
+              </AccordionSection>
             );
           })}
         </ScrollView>
@@ -166,8 +199,9 @@ const s = StyleSheet.create({
   tabItemActive: { borderBottomColor: theme.colors.primary },
   tabItemText: { fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary },
   tabItemTextActive: { color: theme.colors.primary },
-  sectionHeader: { fontSize: 17, fontWeight: 'bold', color: theme.colors.primaryDark, marginVertical: 14, marginLeft: 16 },
-  card: { flexDirection: 'row', backgroundColor: theme.colors.surface, marginHorizontal: 16, marginBottom: 10, borderRadius: 12, overflow: 'hidden', elevation: 2 },
+  sectionHeader: { fontSize: 17, fontWeight: 'bold', color: theme.colors.primaryDark },
+  accordionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9F9F9', paddingVertical: 14, paddingHorizontal: 16, marginTop: 10, borderBottomWidth: 1, borderBottomColor: '#EEE' },
+  card: { flexDirection: 'row', backgroundColor: theme.colors.surface, marginHorizontal: 16, marginTop: 10, borderRadius: 12, overflow: 'hidden', elevation: 2 },
   cardImage: { width: 90, height: 90 },
   cardInfo: { flex: 1, padding: 12, justifyContent: 'center' },
   cardTitle: { fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 3 },
