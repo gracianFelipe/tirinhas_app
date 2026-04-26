@@ -59,6 +59,8 @@ const PRODUCT_IMAGES: Record<string, ImageSourcePropType> = {
   'soda_maracuja.png': require('../../assets/products/soda_maracuja.png'),
   'soda_limao.png': require('../../assets/products/soda_limao.png'),
   'soda_framboesa.png': require('../../assets/products/soda_framboesa.png'),
+  'soda_maca_verde.png': require('../../assets/products/soda_maca_verde.png'),
+  'soda_frutas_vermelhas.png': require('../../assets/products/soda_frutas_vermelhas.png'),
 };
 
 const FALLBACK_IMAGE: ImageSourcePropType = require('../../assets/logo2.jpg');

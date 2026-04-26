@@ -20,15 +20,15 @@ const TABS: { key: Tab; label: string }[] = [
 ];
 
 const DRINK_GROUPS = [
-  { label: '🥤 Latas', match: (n: string) => n.toLowerCase().includes('lata') && !n.toLowerCase().includes('soda') && !n.toLowerCase().includes('limoneto') },
-  { label: '🍼 Garrafinhas 500ml', match: (n: string) => (n.includes('500ml') || n.includes('500 ml')) && !n.toLowerCase().includes('h2o') },
-  { label: '🧊 Refri 1L', match: (n: string) => n.toLowerCase().includes('1l') },
-  { label: '🌊 Refri 2L', match: (n: string) => n.toLowerCase().includes('2l') },
-  { label: '✨ Especiais (Sodas, H2O, Limoneto)', match: (n: string) => 
-      n.toLowerCase().includes('soda') || 
+  { label: '🥤 Latas', match: (n: string) => n.toLowerCase().includes('lata') && !n.toLowerCase().includes('soda') },
+  { label: '🍼 500ml', match: (n: string) => 
+      (n.toLowerCase().includes('500ml') || n.toLowerCase().includes('500 ml')) || 
       n.toLowerCase().includes('h2o') || 
       n.toLowerCase().includes('limoneto') 
   },
+  { label: '🧊 Refri 1l', match: (n: string) => n.toLowerCase().includes('1l') },
+  { label: '🌊 Refri 2L', match: (n: string) => n.toLowerCase().includes('2l') },
+  { label: '✨ Especiais', match: (n: string) => n.toLowerCase().includes('soda') },
 ];
 
 function AccordionSection({ title, children, defaultOpen = false }: { title: string, children: React.ReactNode, defaultOpen?: boolean }) {

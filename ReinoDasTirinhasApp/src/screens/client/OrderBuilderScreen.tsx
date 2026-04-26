@@ -14,13 +14,15 @@ const DEFAULT_FREE_SAUCES = 2;
 const SUCCESS_LOTTIE = { uri: 'https://lottie.host/74f1778c-0f9c-4654-8e11-e737119e8834/A9Wd0R4V2E.json' };
 
 const DRINK_GROUPS = [
-  { label: '🥤 Latas', match: (n: string) => n.toLowerCase().includes('lata') && !n.toLowerCase().includes('soda') && !n.toLowerCase().includes('limoneto') },
-  { label: '🍼 Garrafinhas 500ml', match: (n: string) => (n.includes('500ml') || n.includes('500 ml')) && !n.toLowerCase().includes('h2o') },
-  { label: '🧊 Refri 1L', match: (n: string) => n.toLowerCase().includes('1l') },
-  { label: '🌊 Refri 2L', match: (n: string) => n.toLowerCase().includes('2l') },
-  { label: '✨ Especiais (Sodas, H2O, Limoneto)', match: (n: string) => 
-      n.toLowerCase().includes('soda') || n.toLowerCase().includes('h2o') || n.toLowerCase().includes('limoneto') 
+  { label: '🥤 Latas', match: (n: string) => n.toLowerCase().includes('lata') && !n.toLowerCase().includes('soda') },
+  { label: '🍼 500ml', match: (n: string) => 
+      (n.toLowerCase().includes('500ml') || n.toLowerCase().includes('500 ml')) || 
+      n.toLowerCase().includes('h2o') || 
+      n.toLowerCase().includes('limoneto') 
   },
+  { label: '🧊 Refri 1l', match: (n: string) => n.toLowerCase().includes('1l') },
+  { label: '🌊 Refri 2L', match: (n: string) => n.toLowerCase().includes('2l') },
+  { label: '✨ Especiais', match: (n: string) => n.toLowerCase().includes('soda') },
 ];
 
 const ACOMP_GROUPS = [
