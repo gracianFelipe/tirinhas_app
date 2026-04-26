@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Feather } from '@expo/vector-icons';
-import { theme } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
 import { resolveProductImage } from '../../utils/productImages';
 import { Product, RootStackParamList } from '../../types';
+import { useTheme } from '../../contexts/ThemeContext';
+import LoyaltyBanner from '../../components/LoyaltyBanner';
+import { getLoyaltyInfo, LoyaltyInfo } from '../../utils/loyalty';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Menu'>;
 type Tab = 'tirinhas' | 'barcas' | 'acompanhamentos' | 'bebidas';
@@ -16,23 +18,6 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'acompanhamentos', label: '🍟 Extras' },
   { key: 'bebidas', label: '🥤 Bebidas' },
 ];
-
-function AccordionSection({ title, children, defaultOpen = false }: { title: string, children: React.ReactNode, defaultOpen?: boolean }) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-  return (
-    <View style={{ marginBottom: 4 }}>
-      <TouchableOpacity
-        style={s.accordionHeader}
-        onPress={() => setIsOpen(!isOpen)}
-        activeOpacity={0.7}
-      >
-        <Text style={s.sectionHeader}>{title}</Text>
-        <Feather name={isOpen ? "chevron-up" : "chevron-down"} size={20} color={theme.colors.primaryDark} />
-      </TouchableOpacity>
-      {isOpen && <View style={{ paddingBottom: 10 }}>{children}</View>}
-    </View>
-  );
-}
 
 const DRINK_GROUPS = [
   { label: '🥤 Latas', match: (n: string) => n.toLowerCase().includes('lata') && !n.toLowerCase().includes('soda') && !n.toLowerCase().includes('limoneto') },
@@ -46,10 +31,30 @@ const DRINK_GROUPS = [
   },
 ];
 
+function AccordionSection({ title, children, defaultOpen = false }: { title: string, children: React.ReactNode, defaultOpen?: boolean }) {
+  const { theme } = useTheme();
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  return (
+    <View style={{ marginBottom: 4 }}>
+      <TouchableOpacity
+        style={[s.accordionHeader, { backgroundColor: theme.colors.surface, borderBottomColor: theme.colors.background }]}
+        onPress={() => setIsOpen(!isOpen)}
+        activeOpacity={0.7}
+      >
+        <Text style={[s.sectionHeader, { color: theme.colors.primaryDark }]}>{title}</Text>
+        <Feather name={isOpen ? "chevron-up" : "chevron-down"} size={20} color={theme.colors.primaryDark} />
+      </TouchableOpacity>
+      {isOpen && <View style={{ paddingBottom: 10 }}>{children}</View>}
+    </View>
+  );
+}
+
 export default function MenuScreen({ route, navigation }: Props) {
+  const { theme, isDark, toggleTheme } = useTheme();
   const user = route.params?.user;
   const [products, setProducts] = useState<Product[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>('tirinhas');
+  const [loyalty, setLoyalty] = useState<LoyaltyInfo | null>(null);
 
   useEffect(() => {
     supabase.from('products').select('id, name, description, price, category, image')
@@ -58,6 +63,19 @@ export default function MenuScreen({ route, navigation }: Props) {
         if (!error && data) setProducts(data as Product[]);
       });
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchLoyalty = async () => {
+      const { count } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'Entregue');
+      setLoyalty(getLoyaltyInfo(count || 0));
+    };
+    fetchLoyalty();
+  }, [user]);
 
   const byCategory = (cat: string) => products.filter(p => p.category === cat);
 
@@ -76,13 +94,17 @@ export default function MenuScreen({ route, navigation }: Props) {
   const renderCard = (item: Product) => {
     const clickable = ['Tirinha', 'Acompanhamento', 'Barca', 'Bebida'].includes(item.category);
     return (
-      <TouchableOpacity style={s.card} activeOpacity={clickable ? 0.7 : 1} onPress={() => clickable && handlePress(item)}>
+      <TouchableOpacity 
+        style={[s.card, { backgroundColor: theme.colors.surface }]} 
+        activeOpacity={clickable ? 0.7 : 1} 
+        onPress={() => clickable && handlePress(item)}
+      >
         <Image source={resolveProductImage(item.image)} style={s.cardImage} />
         <View style={s.cardInfo}>
-          <Text style={s.cardTitle}>{item.name}</Text>
-          <Text style={s.cardDesc}>{item.description}</Text>
-          {item.price > 0 && <Text style={s.cardPrice}>R$ {item.price.toFixed(2)}</Text>}
-          {clickable && <Text style={s.cardAction}>+ PEDIR</Text>}
+          <Text style={[s.cardTitle, { color: theme.colors.textPrimary }]}>{item.name}</Text>
+          <Text style={[s.cardDesc, { color: theme.colors.textSecondary }]}>{item.description}</Text>
+          {item.price > 0 && <Text style={[s.cardPrice, { color: theme.colors.primary }]}>R$ {item.price.toFixed(2)}</Text>}
+          {clickable && <Text style={[s.cardAction, { color: theme.colors.primary }]}>+ PEDIR</Text>}
         </View>
       </TouchableOpacity>
     );
@@ -156,31 +178,41 @@ export default function MenuScreen({ route, navigation }: Props) {
   };
 
   return (
-    <View style={s.container}>
+    <View style={[s.container, { backgroundColor: theme.colors.background }]}>
       {/* Header */}
-      <View style={s.header}>
+      <View style={[s.header, { backgroundColor: theme.colors.surface, borderColor: isDark ? '#333' : '#EFEFEF' }]}>
         <TouchableOpacity style={s.homeButton} onPress={async () => { await supabase.auth.signOut(); navigation.replace('Splash'); }}>
           <Feather name="log-out" size={24} color={theme.colors.primaryDark} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Cardápio</Text>
-        {user && (
-          <TouchableOpacity style={s.ordersButton} onPress={() => navigation.navigate('MyOrders', { user })}>
-            <Feather name="clipboard" size={22} color={theme.colors.primaryDark} />
+        <Text style={[s.headerTitle, { color: theme.colors.textPrimary }]}>Cardápio</Text>
+        
+        <View style={s.headerRight}>
+          <TouchableOpacity style={s.themeToggle} onPress={toggleTheme}>
+            <Feather name={isDark ? "sun" : "moon"} size={22} color={theme.colors.primaryDark} />
           </TouchableOpacity>
-        )}
+          {user && (
+            <TouchableOpacity style={s.ordersButton} onPress={() => navigation.navigate('MyOrders', { user })}>
+              <Feather name="clipboard" size={22} color={theme.colors.primaryDark} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
+      {user && loyalty && <LoyaltyBanner info={loyalty} />}
+
       {/* Tab bar */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabBar} contentContainerStyle={s.tabBarContent}>
-        {TABS.map(tab => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[s.tabItem, activeTab === tab.key && s.tabItemActive]}
-            onPress={() => setActiveTab(tab.key)}>
-            <Text style={[s.tabItemText, activeTab === tab.key && s.tabItemTextActive]}>{tab.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <View style={{ backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderColor: isDark ? '#333' : '#EFEFEF' }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabBar} contentContainerStyle={s.tabBarContent}>
+          {TABS.map(tab => (
+            <TouchableOpacity
+              key={tab.key}
+              style={[s.tabItem, activeTab === tab.key && { borderBottomColor: theme.colors.primary }]}
+              onPress={() => setActiveTab(tab.key)}>
+              <Text style={[s.tabItemText, { color: theme.colors.textSecondary }, activeTab === tab.key && { color: theme.colors.primary }]}>{tab.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
       <View style={{ flex: 1 }}>{renderTabContent()}</View>
     </View>
@@ -188,24 +220,24 @@ export default function MenuScreen({ route, navigation }: Props) {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.background },
-  header: { backgroundColor: theme.colors.surface, paddingTop: 48, paddingBottom: 16, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 1, borderColor: '#EFEFEF' },
+  container: { flex: 1 },
+  header: { paddingTop: 48, paddingBottom: 16, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 1, flexDirection: 'row' },
   homeButton: { position: 'absolute', left: 16, bottom: 14, padding: 6 },
-  ordersButton: { position: 'absolute', right: 16, bottom: 14, padding: 6 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', color: theme.colors.textPrimary },
-  tabBar: { backgroundColor: theme.colors.surface, borderBottomWidth: 1, borderColor: '#EFEFEF', flexGrow: 0 },
+  headerRight: { position: 'absolute', right: 16, bottom: 14, flexDirection: 'row', alignItems: 'center' },
+  themeToggle: { padding: 6, marginRight: 8 },
+  ordersButton: { padding: 6 },
+  headerTitle: { fontSize: 20, fontWeight: 'bold' },
+  tabBar: { flexGrow: 0 },
   tabBarContent: { paddingHorizontal: 4 },
   tabItem: { paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 3, borderBottomColor: 'transparent' },
-  tabItemActive: { borderBottomColor: theme.colors.primary },
-  tabItemText: { fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary },
-  tabItemTextActive: { color: theme.colors.primary },
-  sectionHeader: { fontSize: 17, fontWeight: 'bold', color: theme.colors.primaryDark },
-  accordionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9F9F9', paddingVertical: 14, paddingHorizontal: 16, marginTop: 10, borderBottomWidth: 1, borderBottomColor: '#EEE' },
-  card: { flexDirection: 'row', backgroundColor: theme.colors.surface, marginHorizontal: 16, marginTop: 10, borderRadius: 12, overflow: 'hidden', elevation: 2 },
+  tabItemText: { fontSize: 13, fontWeight: '700' },
+  sectionHeader: { fontSize: 17, fontWeight: 'bold' },
+  accordionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, marginTop: 10, borderBottomWidth: 1 },
+  card: { flexDirection: 'row', marginHorizontal: 16, marginTop: 10, borderRadius: 12, overflow: 'hidden', elevation: 2 },
   cardImage: { width: 90, height: 90 },
   cardInfo: { flex: 1, padding: 12, justifyContent: 'center' },
-  cardTitle: { fontSize: 15, fontWeight: 'bold', color: theme.colors.textPrimary, marginBottom: 3 },
-  cardDesc: { fontSize: 11, color: theme.colors.textSecondary, marginBottom: 6 },
-  cardPrice: { fontSize: 14, fontWeight: '800', color: theme.colors.primary },
-  cardAction: { color: theme.colors.primary, marginTop: 6, fontSize: 12, fontWeight: 'bold' },
+  cardTitle: { fontSize: 15, fontWeight: 'bold', marginBottom: 3 },
+  cardDesc: { fontSize: 11, marginBottom: 6 },
+  cardPrice: { fontSize: 14, fontWeight: '800' },
+  cardAction: { marginTop: 6, fontSize: 12, fontWeight: 'bold' },
 });

@@ -11,13 +11,14 @@ import BarcaOrderScreen from './src/screens/client/BarcaOrderScreen';
 import BebidaOrderScreen from './src/screens/client/BebidaOrderScreen';
 import MyOrdersScreen from './src/screens/client/MyOrdersScreen';
 import DashboardScreen from './src/screens/employee/DashboardScreen';
-import { RootStackParamList } from './src/types';
+import { ThemeProvider } from './src/contexts/ThemeContext';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
   return (
-    <NavigationContainer>
+    <ThemeProvider>
+      <NavigationContainer>
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
@@ -35,6 +36,7 @@ export default function App() {
         <Stack.Screen name="BebidaOrder" component={BebidaOrderScreen} />
         <Stack.Screen name="MyOrders" component={MyOrdersScreen} />
       </Stack.Navigator>
-    </NavigationContainer>
+      </NavigationContainer>
+    </ThemeProvider>
   );
 }
